@@ -17,8 +17,8 @@ from telegram.ext import (
 )
 
 # ⚙️ აქ ჩასვი შენი BotFather-ის TOKEN
-BOT_TOKEN = "8375308624:AAHy3qHw4Au0F1HpHODx4mufhJ3M_jTe5CQ"  # ← აქ ჩასვი შენი ნამდვილი ტოკენი
-
+# BOT_TOKEN = "8375308624:AAHy3qHw4Au0F1HpHODx4mufhJ3M_jTe5CQ"  # ← აქ ჩასვი შენი ნამდვილი ტოკენი
+BOT_TOKEN = os.environ["BOT_TOKEN"]
 # ⚙️ აქ ჩასვი შენი პირადი Telegram user ID (admin)
 ADMIN_ID = 8201387380  # შეცვალე შენზე
 
@@ -512,3 +512,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
