@@ -161,6 +161,39 @@ def get_subscription_info(chat_id: int) -> str:
 
 # ==================== Command handler-ები ====================
 
+# async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     chat = update.effective_chat
+#     user = update.effective_user
+
+#     subscribers = load_subscribers()
+#     exists = any(sub.get("id") == chat.id for sub in subscribers)
+
+#     if not exists:
+#         subscribers.append({
+#             "id": chat.id,
+#             "username": user.username,
+#             "first_name": user.first_name,
+#             "last_name": user.last_name,
+#         })
+#         save_subscribers(subscribers)
+#  text = (
+#             "გამარჯობა 🌟\n\n"
+#             "თუ გაინტერესებს ასტროლოგია, ტარო, ალქიმია, ტრანზიტების ანალიზი — ეს მხოლოდ მცირე ჩამონათვალია. "
+#             "ჩვენს დახურულ არხზე შენ გელოდება ცოდნა, რომელიც საჯაროდ არ ზიარდება. "
+#             "ექსკლუზიური ვიდეოები და ყოველდღიური პროგნოზები, რომლებიც შენს რეალობას შეცვლის.\n\n"
+#             "გამოიყენე /subscribe\n"
+#             "ფასის გასაგებად გამოიყენე /price.\n"
+#         )
+#     else:
+#         text = (
+#             "კიდევ ერთხელ მოგესალმები! ✨\n"
+#             "შენ უკვე გამოწერილი გაქვს პრემიუმ სივრცე.\n"
+#             "ფასის გასაგებად გამოიყენე /price,\n"
+#             "გასაუქმებლად /unsubscribe.\n"
+#         )
+
+#     await context.bot.send_message(chat_id=chat.id, text=text)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
@@ -176,7 +209,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "last_name": user.last_name,
         })
         save_subscribers(subscribers)
- text = (
+
+        text = (
             "გამარჯობა 🌟\n\n"
             "თუ გაინტერესებს ასტროლოგია, ტარო, ალქიმია, ტრანზიტების ანალიზი — ეს მხოლოდ მცირე ჩამონათვალია. "
             "ჩვენს დახურულ არხზე შენ გელოდება ცოდნა, რომელიც საჯაროდ არ ზიარდება. "
@@ -193,6 +227,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     await context.bot.send_message(chat_id=chat.id, text=text)
+
 
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -514,6 +549,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
