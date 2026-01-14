@@ -19,6 +19,7 @@ from telegram.ext import (
 # ⚙️ აქ ჩასვი შენი BotFather-ის TOKEN
 # BOT_TOKEN = "8375308624:AAHy3qHw4Au0F1HpHODx4mufhJ3M_jTe5CQ"  # ← აქ ჩასვი შენი ნამდვილი ტოკენი
 BOT_TOKEN = os.environ["BOT_TOKEN"]
+# BOT_TOKEN = "8372852069:AAFyAckZM4N3pStqvQwa3zqefpC8fNOsmSA" 
 # ⚙️ აქ ჩასვი შენი პირადი Telegram user ID (admin)
 ADMIN_ID = 8201387380  # შეცვალე შენზე
 
@@ -28,6 +29,7 @@ GROUP_LINK = "https://t.me/+rCNHBtic_rJhYmIy"
 
 # გამომწერთა სიის ფაილი
 SUBSCRIBERS_FILE = "subscribers.json"
+RECEIPTS_FILE = "receipts.json"
 
 # სუბსქრიფშენების ფაილი
 SUBSCRIPTIONS_FILE = "subscriptions.json"
@@ -38,6 +40,32 @@ TAX_RATE = 0       # 18% VAT
 
 
 # ==================== Utility: გამომწერები ====================
+
+def load_receipts():
+    if not os.path.exists(RECEIPTS_FILE):
+        return {}
+    with open(RECEIPTS_FILE, "r", encoding="utf-8") as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+
+def save_receipts(data):
+    with open(RECEIPTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def increment_receipt_count(chat_id: int) -> int:
+    data = load_receipts()
+    key = str(chat_id)
+    data[key] = data.get(key, 0) + 1
+    save_receipts(data)
+    return data[key]
+
+def is_subscriber(chat_id: int) -> bool:
+    subscribers = load_subscribers()
+    return any(sub.get("id") == chat_id for sub in subscribers)
+
+
 
 def load_subscribers():
     """ჩატვირთავს subscribers.json ფაილს და საჭირო হলে დაანორმალებს სტრუქტურას."""
@@ -470,39 +498,47 @@ async def payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 from telegram.constants import ParseMode
 
+GROUP_LINK_AFTER_RECEIPT = "https://t.me/+79itfRG-edE1M2Yy"
+
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    იძახება, როცა იუზერი აგზავნის ფოტოს.
-    თუ ამ იუზერისთვის მონიშნულია waiting_for_receipt,
-    ვთვლით, რომ ეს არის გადახდის ქვითარი.
-    """
     chat_id = update.effective_chat.id
     user = update.effective_user
-
-    # თუ ამ იუზერისთვის არ ველოდებით ქვითარს, არაფერს ვაკეთებთ
-    if not context.user_data.get("waiting_for_receipt"):
-        return
-
-    # ერთხელ რომ დაამუშავოს, მოვხსნათ ფლაგი
-    context.user_data["waiting_for_receipt"] = False
 
     if not update.message or not update.message.photo:
         return
 
-    # 👉 1) ფოტო არ ვიღებთ file_id-ით, პირდაპირ ვფორვარდებთ მთელ მესიჯს
+    # ✅ ქვითარს ვიღებთ თუ:
+    # 1) user-ს ველოდებით ქვითარს (waiting_for_receipt=True)
+    # ან
+    # 2) user უკვე subscriber-ია (ერთხელ მაინც /start ან /subscribe აქვს გაკეთებული)
+    waiting = bool(context.user_data.get("waiting_for_receipt"))
+    subscriber = is_subscriber(chat_id)
+
+    if not waiting and not subscriber:
+        # არ არის "payment flow"-ში და არც subscriber -> ნებისმიერი ფოტო არ ჩავთვალოთ ქვითრად
+        return
+
+    # ერთხელ რომ იყო ჩართული "waiting_for_receipt", მოვხსნათ
+    context.user_data["waiting_for_receipt"] = False
+
+    # სურვილისამებრ: დავითვალოთ რამდენჯერ გამოგზავნა ქვითარი
+    receipt_num = increment_receipt_count(chat_id)
+
+    # 1) ფოტო/მესიჯი ვუფორვარდოთ ადმინს
     await context.bot.forward_message(
         chat_id=ADMIN_ID,
         from_chat_id=chat_id,
         message_id=update.message.message_id,
     )
 
-    # 👉 2) ცალკე ტექსტური მესიჯი ადმინს /approve ბრძანებით
+    # 2) ადმინს მივწეროთ დეტალები + approve shortcut
     caption = (
         "📥 ახალი გადახდის ქვითარი Shen Space-ისთვის\n\n"
+        f"Receipt #: *{receipt_num}*\n"
         f"User ID: `{chat_id}`\n"
         f"Username: @{user.username if user.username else '—'}\n"
         f"სახელი: {user.full_name}\n\n"
-        f"დადასტურებისას შეგიძლია გამოიყენო:\n"
+        f"დადასტურებისას გამოიყენე:\n"
         f"/approve {chat_id}"
     )
 
@@ -512,12 +548,12 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
         parse_mode=ParseMode.MARKDOWN,
     )
 
-    # 👉 3) პასუხი მომხმარებელს + ჯგუფის ლინკი
+    # 3) ✅ იუზერს ყოველ ჯერზე ერთი და იგივე პასუხი (როგორც გინდა)
     await update.message.reply_text(
-        "გადახდის ქვითaრი მიღებულია 🌟\n"
-        "შეგიძლია უკვე შემოხვიდე Shen Space-ის დახურულ ჯგუფში:\n"
-        f"{GROUP_LINK}\n\n"
-        "ადმინი გადაამოწმებს ჩარიცხვას და საბოლოოდ დაამტკიცებს შენს წევრობას."
+        "მადლობა 🙏\n"
+        "გთხოვთ გადახვიდეთ ლინკზე:\n"
+        f"{GROUP_LINK_AFTER_RECEIPT}\n"
+        "და ადმინი დაგიდასტურებთ <3"
     )
 
 
@@ -549,7 +585,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 
