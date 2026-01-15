@@ -21,8 +21,8 @@ from telegram.ext import (
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 # BOT_TOKEN = "8372852069:AAFyAckZM4N3pStqvQwa3zqefpC8fNOsmSA" 
 # ⚙️ აქ ჩასვი შენი პირადი Telegram user ID (admin)
-ADMIN_ID = 8201387380  # შეცვალე შენზე
-
+# ADMIN_ID = 8201387380  # შეცვალე შენზე
+ADMIN_IDS = {8201387380, 8313922766}
 # დახურული ჯგუფის ლინკი (invite link)
 GROUP_LINK = "https://t.me/+rCNHBtic_rJhYmIy" 
 # GROUP_LINK = "https://t.me/+by5kgyP5JPAwYmEy"  # ← აქ ჩაწერე შენი რეალური ჯგუფის ლინკი
@@ -40,6 +40,9 @@ TAX_RATE = 0       # 18% VAT
 
 
 # ==================== Utility: გამომწერები ====================
+def is_admin(user_id: int) -> bool:
+    return user_id in ADMIN_IDS
+
 
 def load_receipts():
     if not os.path.exists(RECEIPTS_FILE):
@@ -352,7 +355,8 @@ async def price(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id != ADMIN_ID:
+    # if user_id != ADMIN_ID:
+    if user_id not in ADMIN_IDS:
         await update.message.reply_text("ამ ბრძანების გამოყენება მხოლოდ ადმინს შეუძლია.")
         return
 
@@ -421,7 +425,8 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    if user_id != ADMIN_ID:
+    # if user_id != ADMIN_ID:
+    if user_id not in ADMIN_IDS:
         await update.message.reply_text("ამ ბრძანების გამოყენება მხოლოდ ადმინს შეუძლია.")
         return
 
@@ -525,12 +530,17 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     receipt_num = increment_receipt_count(chat_id)
 
     # 1) ფოტო/მესიჯი ვუფორვარდოთ ადმინს
+    # await context.bot.forward_message(
+    #     chat_id=ADMIN_ID,
+    #     from_chat_id=chat_id,
+    #     message_id=update.message.message_id,
+    # )
+for admin_id in ADMIN_IDS:
     await context.bot.forward_message(
-        chat_id=ADMIN_ID,
+        chat_id=admin_id,
         from_chat_id=chat_id,
         message_id=update.message.message_id,
     )
-
     # 2) ადმინს მივწეროთ დეტალები + approve shortcut
     caption = (
         "📥 ახალი გადახდის ქვითარი Shen Space-ისთვის\n\n"
@@ -542,8 +552,14 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
         f"/approve {chat_id}"
     )
 
+    # await context.bot.send_message(
+    #     chat_id=ADMIN_ID,
+    #     text=caption,
+    #     parse_mode=ParseMode.MARKDOWN,
+    # )
+for admin_id in ADMIN_IDS:
     await context.bot.send_message(
-        chat_id=ADMIN_ID,
+        chat_id=admin_id,
         text=caption,
         parse_mode=ParseMode.MARKDOWN,
     )
@@ -585,6 +601,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
