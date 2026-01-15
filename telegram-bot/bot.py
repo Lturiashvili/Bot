@@ -535,13 +535,15 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
     #     from_chat_id=chat_id,
     #     message_id=update.message.message_id,
     # )
-for admin_id in ADMIN_IDS:
-    await context.bot.forward_message(
-        chat_id=admin_id,
-        from_chat_id=chat_id,
-        message_id=update.message.message_id,
-    )
-    # 2) ადმინს მივწეროთ დეტალები + approve shortcut
+    # 1) ფოტო/მესიჯი ვუფორვარდოთ ყველა ადმინს
+    for admin_id in ADMIN_IDS:
+        await context.bot.forward_message(
+            chat_id=admin_id,
+            from_chat_id=chat_id,
+            message_id=update.message.message_id,
+        )
+
+    # 2) ადმინებს მივწეროთ დეტალები + approve shortcut
     caption = (
         "📥 ახალი გადახდის ქვითარი Shen Space-ისთვის\n\n"
         f"Receipt #: *{receipt_num}*\n"
@@ -552,25 +554,21 @@ for admin_id in ADMIN_IDS:
         f"/approve {chat_id}"
     )
 
-    # await context.bot.send_message(
-    #     chat_id=ADMIN_ID,
-    #     text=caption,
-    #     parse_mode=ParseMode.MARKDOWN,
-    # )
-for admin_id in ADMIN_IDS:
-    await context.bot.send_message(
-        chat_id=admin_id,
-        text=caption,
-        parse_mode=ParseMode.MARKDOWN,
-    )
+    for admin_id in ADMIN_IDS:
+        await context.bot.send_message(
+            chat_id=admin_id,
+            text=caption,
+            parse_mode=ParseMode.MARKDOWN,
+        )
 
-    # 3) ✅ იუზერს ყოველ ჯერზე ერთი და იგივე პასუხი (როგორც გინდა)
+    # 3) იუზერს პასუხი
     await update.message.reply_text(
         "მადლობა 🙏\n"
         "გთხოვთ გადახვიდეთ ლინკზე:\n"
         f"{GROUP_LINK_AFTER_RECEIPT}\n"
         "და ადმინი დაგიდასტურებთ <3"
     )
+
 
 
 # ==================== main ====================
@@ -601,6 +599,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
