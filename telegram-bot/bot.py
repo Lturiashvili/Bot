@@ -31,7 +31,7 @@ ADMIN_IDS = {8201387380, 8313922766}
 GROUP_LINK = "https://t.me/+rCNHBtic_rJhYmIy" 
 POLL_INTERVAL_DAYS = 30
 # გამომწერთა სიის ფაილი
-DATA_DIR = os.environ.get("DATA_DIR", "/var/data")
+DATA_DIR = os.environ.get("DATA_DIR", "/tmp/data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 SUBSCRIBERS_FILE = os.path.join(DATA_DIR, "subscribers.json")
@@ -922,9 +922,7 @@ def main():
     # IMPORTANT: auto_poll_job უნდა იყოს main()-ზე ზემოთ აღწერილი!
     app.job_queue.run_repeating(auto_poll_job, interval=24 * 60 * 60, first=30)
 
-    # ✅ 6) DEBUG (ყველაზე ბოლოს!)
-    # დროებით ჯობია ALL არ იყოს, თორემ ყველაფერს "შეჭამს" ლოგიკურად
-    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.Document.ALL, debug_all))
+
 
     print("Bot started...")
     app.run_polling()
@@ -933,6 +931,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
