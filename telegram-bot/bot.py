@@ -40,6 +40,8 @@ TAX_RATE = 0       # 18% VAT
 
 
 # ==================== Utility: გამომწერები ====================
+
+
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
@@ -512,36 +514,44 @@ async def handle_receipt_media(update: Update, context: ContextTypes.DEFAULT_TYP
     if not update.message:
         return
 
-    # მოვიღოთ message_id რომ ფორვარდი გავაკეთოთ
+    # message_id ფორვარდისთვის
     msg_id = update.message.message_id
 
-    # განსაზღვრე არის თუ არა “სურათი”
+    # არის თუ არა სურათი
     is_photo = bool(update.message.photo)
-    is_image_doc = bool(update.message.document and (update.message.document.mime_type or "").startswith("image/"))
+    is_image_doc = bool(
+        update.message.document
+        and (update.message.document.mime_type or "").startswith("image/")
+    )
 
     if not is_photo and not is_image_doc:
         return
 
-    # ✅ ქვითარს ვიღებთ თუ:
+    # ქვითარს ვიღებთ თუ:
     waiting = bool(context.user_data.get("waiting_for_receipt"))
     subscriber = is_subscriber(chat_id)
 
     if not waiting and not subscriber:
         return
 
+    # ერთხელ მიღების შემდეგ ვხსნით ფლაგს
     context.user_data["waiting_for_receipt"] = False
 
     receipt_num = increment_receipt_count(chat_id)
 
-    # 1) გავუფორვარდოთ ადმინებს
+    # 1️⃣ ფორვარდი ადმინებთან (უსაფრთხოდ)
     for admin_id in ADMIN_IDS:
-        await context.bot.forward_message(
-            chat_id=admin_id,
-            from_chat_id=chat_id,
-            message_id=msg_id,
-        )
+        try:
+            await context.bot.forward_message(
+                chat_id=admin_id,
+                from_chat_id=chat_id,
+                message_id=msg_id,
+            )
+        except Exception as e:
+            print(f"Forward to admin {admin_id} failed: {e!r}")
 
-    # 2) ადმინებს გავუგზავნოთ დეტალები + approve shortcut
+
+    # 2️⃣ ტექსტური დეტალები ადმინებისთვის
     caption = (
         "📥 ახალი გადახდის ქვითარი Shen Space-ისთვის\n\n"
         f"Receipt #: *{receipt_num}*\n"
@@ -553,19 +563,43 @@ async def handle_receipt_media(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
     for admin_id in ADMIN_IDS:
-        await context.bot.send_message(
-            chat_id=admin_id,
-            text=caption,
-            parse_mode=ParseMode.MARKDOWN,
-        )
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=caption,
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception as e:
+            print(f"Send text to admin {admin_id} failed: {e!r}")
 
-    # 3) იუზერს პასუხი
+
+    # 3️⃣ პასუხი მომხმარებელს
     await update.message.reply_text(
         "მადლობა 🙏\n"
         "გთხოვთ გადახვიდეთ ლინკზე:\n"
         f"{GROUP_LINK_AFTER_RECEIPT}\n"
-        "და ადმინი დაგიდასტურებთ <3"
+        "და ადმინი დაგიდასტურებთ ❤️"
     )
+
+
+
+    # ==================== DEBUG ====================
+
+async def debug_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+
+    m = update.message
+    print("=== DEBUG ===")
+    print("chat_id:", update.effective_chat.id)
+    print("text:", m.text)
+    print("has_photo:", bool(m.photo))
+    print("has_document:", bool(m.document))
+    if m.document:
+        print("doc mime:", m.document.mime_type)
+        print("doc file_name:", m.document.file_name)
+    print("caption:", m.caption)
+    print("==============")
 
 
 
@@ -589,11 +623,11 @@ def main():
     # Callback ღილაკების დამუშავება
     app.add_handler(CallbackQueryHandler(payment_callback))
 
-    # ქვითრის ფოტოს ჰენდლერი
-    # app.add_handler(MessageHandler(filters.PHOTO, handle_receipt_photo))
     # ქვითრის (photo ან image-document) ჰენდლერი
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_receipt_media))
 
+    # 🧪 DEBUG — ეს დაამატე ყველაზე ბოლოს
+    app.add_handler(MessageHandler(filters.ALL, debug_all))
 
     print("Bot started...")
     app.run_polling()
@@ -601,12 +635,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
