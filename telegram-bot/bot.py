@@ -505,52 +505,50 @@ from telegram.constants import ParseMode
 
 GROUP_LINK_AFTER_RECEIPT = "https://t.me/+79itfRG-edE1M2Yy"
 
-async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_receipt_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
 
-    if not update.message or not update.message.photo:
+    if not update.message:
+        return
+
+    # მოვიღოთ message_id რომ ფორვარდი გავაკეთოთ
+    msg_id = update.message.message_id
+
+    # განსაზღვრე არის თუ არა “სურათი”
+    is_photo = bool(update.message.photo)
+    is_image_doc = bool(update.message.document and (update.message.document.mime_type or "").startswith("image/"))
+
+    if not is_photo and not is_image_doc:
         return
 
     # ✅ ქვითარს ვიღებთ თუ:
-    # 1) user-ს ველოდებით ქვითარს (waiting_for_receipt=True)
-    # ან
-    # 2) user უკვე subscriber-ია (ერთხელ მაინც /start ან /subscribe აქვს გაკეთებული)
     waiting = bool(context.user_data.get("waiting_for_receipt"))
     subscriber = is_subscriber(chat_id)
 
     if not waiting and not subscriber:
-        # არ არის "payment flow"-ში და არც subscriber -> ნებისმიერი ფოტო არ ჩავთვალოთ ქვითრად
         return
 
-    # ერთხელ რომ იყო ჩართული "waiting_for_receipt", მოვხსნათ
     context.user_data["waiting_for_receipt"] = False
 
-    # სურვილისამებრ: დავითვალოთ რამდენჯერ გამოგზავნა ქვითარი
     receipt_num = increment_receipt_count(chat_id)
 
-    # 1) ფოტო/მესიჯი ვუფორვარდოთ ადმინს
-    # await context.bot.forward_message(
-    #     chat_id=ADMIN_ID,
-    #     from_chat_id=chat_id,
-    #     message_id=update.message.message_id,
-    # )
-    # 1) ფოტო/მესიჯი ვუფორვარდოთ ყველა ადმინს
+    # 1) გავუფორვარდოთ ადმინებს
     for admin_id in ADMIN_IDS:
         await context.bot.forward_message(
             chat_id=admin_id,
             from_chat_id=chat_id,
-            message_id=update.message.message_id,
+            message_id=msg_id,
         )
 
-    # 2) ადმინებს მივწეროთ დეტალები + approve shortcut
+    # 2) ადმინებს გავუგზავნოთ დეტალები + approve shortcut
     caption = (
         "📥 ახალი გადახდის ქვითარი Shen Space-ისთვის\n\n"
         f"Receipt #: *{receipt_num}*\n"
         f"User ID: `{chat_id}`\n"
         f"Username: @{user.username if user.username else '—'}\n"
         f"სახელი: {user.full_name}\n\n"
-        f"დადასტურებისას გამოიყენე:\n"
+        "დადასტურებისას გამოიყენე:\n"
         f"/approve {chat_id}"
     )
 
@@ -571,6 +569,7 @@ async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 
+
 # ==================== main ====================
 
 def main():
@@ -579,7 +578,7 @@ def main():
     # Command handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("subscribe", subscribe))
-    app.add_handler(CommandHandler("unsubscribe", unsubscribe))
+    app.add_handler(CommandHandler("unsubscribe", unsubscribe))    
     app.add_handler(CommandHandler("price", price))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("broadcast", broadcast))
@@ -591,7 +590,10 @@ def main():
     app.add_handler(CallbackQueryHandler(payment_callback))
 
     # ქვითრის ფოტოს ჰენდლერი
-    app.add_handler(MessageHandler(filters.PHOTO, handle_receipt_photo))
+    # app.add_handler(MessageHandler(filters.PHOTO, handle_receipt_photo))
+    # ქვითრის (photo ან image-document) ჰენდლერი
+    app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_receipt_media))
+
 
     print("Bot started...")
     app.run_polling()
@@ -599,6 +601,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
