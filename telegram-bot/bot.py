@@ -15,11 +15,6 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-import logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO
-)
 
 # ⚙️ აქ ჩასვი შენი BotFather-ის TOKEN
 # BOT_TOKEN = "8375308624:AAHy3qHw4Au0F1HpHODx4mufhJ3M_jTe5CQ"  # ← აქ ჩასვი შენი ნამდვილი ტოკენი
@@ -31,8 +26,7 @@ ADMIN_IDS = {8201387380, 8313922766}
 # დახურული ჯგუფის ლინკი (invite link)
 GROUP_LINK = "https://t.me/+rCNHBtic_rJhYmIy" 
 # GROUP_LINK = "https://t.me/+by5kgyP5JPAwYmEy"  # ← აქ ჩაწერე შენი რეალური ჯგუფის ლინკი
-POLL_RESULTS_FILE = "poll_results.json"
-POLL_INTERVAL_DAYS = 30
+
 # გამომწერთა სიის ფაილი
 SUBSCRIBERS_FILE = "subscribers.json"
 RECEIPTS_FILE = "receipts.json"
@@ -129,8 +123,6 @@ def calc_price_with_tax(base_price: float, tax_rate: float) -> float:
 
 # ==================== Utility: სუბსქრიფშენები ====================
 
-
-
 def load_subscriptions():
     """ჩატვირთავს subscriptions.json-ს (user_id → paid_until)."""
     if not os.path.exists(SUBSCRIPTIONS_FILE):
@@ -202,238 +194,38 @@ def get_subscription_info(chat_id: int) -> str:
 
 # ==================== Command handler-ები ====================
 
-def load_poll_results():
-    if not os.path.exists(POLL_RESULTS_FILE):
-        return {}
-    with open(POLL_RESULTS_FILE, "r", encoding="utf-8") as f:
-        try:
-            return json.load(f)
-        except json.JSONDecodeError:
-            return {}
+# async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     chat = update.effective_chat
+#     user = update.effective_user
 
-def save_poll_results(data):
-    with open(POLL_RESULTS_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+#     subscribers = load_subscribers()
+#     exists = any(sub.get("id") == chat.id for sub in subscribers)
 
-def save_user_poll_answer(chat_id: int, key: str, value):
-    data = load_poll_results()
-    uid = str(chat_id)
-    if uid not in data:
-        data[uid] = {}
-    data[uid][key] = value
-    data[uid]["updated_at_utc"] = datetime.utcnow().isoformat()
-    save_poll_results(data)
+#     if not exists:
+#         subscribers.append({
+#             "id": chat.id,
+#             "username": user.username,
+#             "first_name": user.first_name,
+#             "last_name": user.last_name,
+#         })
+#         save_subscribers(subscribers)
+#  text = (
+#             "გამარჯობა 🌟\n\n"
+#             "თუ გაინტერესებს ასტროლოგია, ტარო, ალქიმია, ტრანზიტების ანალიზი — ეს მხოლოდ მცირე ჩამონათვალია. "
+#             "ჩვენს დახურულ არხზე შენ გელოდება ცოდნა, რომელიც საჯაროდ არ ზიარდება. "
+#             "ექსკლუზიური ვიდეოები და ყოველდღიური პროგნოზები, რომლებიც შენს რეალობას შეცვლის.\n\n"
+#             "გამოიყენე /subscribe\n"
+#             "ფასის გასაგებად გამოიყენე /price.\n"
+#         )
+#     else:
+#         text = (
+#             "კიდევ ერთხელ მოგესალმები! ✨\n"
+#             "შენ უკვე გამოწერილი გაქვს პრემიუმ სივრცე.\n"
+#             "ფასის გასაგებად გამოიყენე /price,\n"
+#             "გასაუქმებლად /unsubscribe.\n"
+#         )
 
-def save_user_poll_text(chat_id: int, key: str, text: str):
-    data = load_poll_results()
-    uid = str(chat_id)
-    if uid not in data:
-        data[uid] = {}
-    data[uid][key] = text
-    data[uid]["updated_at_utc"] = datetime.utcnow().isoformat()
-    save_poll_results(data)
-
-def poll_should_be_sent(chat_id: int) -> bool:
-    data = load_poll_results()
-    uid = str(chat_id)
-    info = data.get(uid, {})
-    last = info.get("last_poll_sent_utc")
-    if not last:
-        return True
-    try:
-        last_dt = datetime.fromisoformat(last)
-    except Exception:
-        return True
-    return datetime.utcnow() - last_dt >= timedelta(days=POLL_INTERVAL_DAYS)
-
-def mark_poll_sent(chat_id: int):
-    data = load_poll_results()
-    uid = str(chat_id)
-    if uid not in data:
-        data[uid] = {}
-    data[uid]["last_poll_sent_utc"] = datetime.utcnow().isoformat()
-    save_poll_results(data)
-
-
-async def send_poll_report_to_admin(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user):
-    data = load_poll_results().get(str(chat_id), {})
-    q1 = data.get("q1_like_most", "—")
-    q2 = data.get("q2_missing", "—")
-    q3 = data.get("q3_content_type", "—")
-    q4 = data.get("q4_frequency", "—")
-    q5 = data.get("q5_format", "—")
-
-    text = (
-        "📊 *Shen Space Poll პასუხები*\n\n"
-        f"User ID: `{chat_id}`\n"
-        f"Username: @{user.username if user.username else '—'}\n"
-        f"სახელი: {user.full_name}\n\n"
-        f"*1) ყველაზე მეტად რა მოგწონს?*\n{q1}\n\n"
-        f"*2) რა გაკლია / რას დაამატებდი?*\n{q2}\n\n"
-        f"*3) რომელი კონტენტი გიზიდავს ყველაზე მეტად?*\n{q3}\n\n"
-        f"*4) პოსტების სიხშირე რამდენად კომფორტულია?*\n{q4}\n\n"
-        f"*5) რა ფორმატში გინდა მეტი?*\n{q5}\n"
-    )
-
-    for admin_id in ADMIN_IDS:
-        try:
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=text,
-                parse_mode=ParseMode.MARKDOWN
-            )
-        except Exception as e:
-            print(f"poll report to admin {admin_id} failed: {e!r}")
-
-
-async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    data = query.data
-    chat_id = query.message.chat_id
-    user = update.effective_user
-
-    # --- POLL CALLBACKS ---
-    if data.startswith("poll:"):
-        # poll:q3:inspire
-        _, q, answer = data.split(":", 2)
-
-        # Q3 -> send Q4
-        if q == "q3":
-            save_user_poll_answer(chat_id, "q3_content_type", answer)
-            context.user_data["poll_stage"] = 4
-
-            pretty = {
-                "inspire": "ინსპირაციული ტექსტები",
-                "practical": "პრაქტიკული რჩევები",
-                "education": "განათლება / ცოდნა",
-                "meditation": "მედიტაციები / პრაქტიკები",
-                "taro": "ტარო",
-            }.get(answer, answer)
-
-            await query.edit_message_text(text=f"✅ ჩანიშნულია: {pretty}")
-
-            keyboard = [
-                [InlineKeyboardButton("ძალიან იშვიათია", callback_data="poll:q4:rare")],
-                [InlineKeyboardButton("იდეალურია", callback_data="poll:q4:ideal")],
-                [InlineKeyboardButton("ძალიან ხშირად იდება", callback_data="poll:q4:too_often")],
-            ]
-
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text="*4) რამდენად კომფორტულია შენთვის პოსტების სიხშირე?*",
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-            )
-            return
-
-        # Q4 -> send Q5
-        if q == "q4":
-            save_user_poll_answer(chat_id, "q4_frequency", answer)
-            context.user_data["poll_stage"] = 5
-
-            pretty = {
-                "rare": "ძალიან იშვიათია",
-                "ideal": "იდეალურია",
-                "too_often": "ძალიან ხშირად იდება",
-            }.get(answer, answer)
-
-            await query.edit_message_text(text=f"✅ ჩანიშნულია: {pretty}")
-
-            keyboard = [
-                [InlineKeyboardButton("მოკლე და სწრაფი რჩევები", callback_data="poll:q5:short")],
-                [InlineKeyboardButton("სიღრმისეული სტატიები", callback_data="poll:q5:deep")],
-                [InlineKeyboardButton("ვიდეო/აუდიო ახსნა", callback_data="poll:q5:audio_video")],
-                [InlineKeyboardButton("ცოცხალი ჩართვები", callback_data="poll:q5:live")],
-                [InlineKeyboardButton("მინი-კურსები", callback_data="poll:q5:mini_course")],
-            ]
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text="*5) რა ფორმატში გინდა მეტი კონტენტის მიღება?*",
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-            )
-            return
-
-        # Q5 -> finish
-        if q == "q5":
-            save_user_poll_answer(chat_id, "q5_format", answer)
-
-            pretty = {
-                "short": "მოკლე და სწრაფი რჩევები",
-                "deep": "სიღრმისეული სტატიები",
-                "audio_video": "ვიდეო/აუდიო ახსნა",
-                "live": "ცოცხალი ჩართვები",
-                "mini_course": "მინი-კურსები",
-            }.get(answer, answer)
-
-            await query.edit_message_text(text=f"✅ ჩანიშნულია: {pretty}\n\nმადლობა! 🙏")
-
-            context.user_data["poll_active"] = False
-            context.user_data["poll_stage"] = None
-
-            # სურვილისამებრ: admin report
-            await send_poll_report_to_admin(context, chat_id, user)
-            return
-
-        return
-
-    # --- PAYMENT CALLBACKS (pay_bank / pay_later) ---
-    await payment_callback(update, context)
-
-async def auto_poll_job(context: ContextTypes.DEFAULT_TYPE):
-    subscribers = load_subscribers()
-
-    for sub in subscribers:
-        chat_id = sub.get("id")
-        if not chat_id:
-            continue
-
-        # სურვილისამებრ: მხოლოდ აქტიურებს გაუგზავნე
-        if not has_active_subscription(chat_id):
-            continue
-
-        if not poll_should_be_sent(chat_id):
-            continue
-
-        # PTB JobQueue-ში user ობიექტი არ გაქვს, ამიტომ dummy
-        dummy_user = type(
-            "U",
-            (),
-            {
-                "username": sub.get("username"),
-                "full_name": f"{sub.get('first_name') or ''} {sub.get('last_name') or ''}".strip() or "—",
-            },
-        )()
-
-        try:
-            mark_poll_sent(chat_id)
-            await start_poll_flow(chat_id, dummy_user, context)
-        except Exception as e:
-            print(f"auto poll failed for {chat_id}: {e!r}")
-
-
-async def poll_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    user = update.effective_user
-
-    # ✅ admin-ს ყოველთვის შეეძლოს ტესტი
-    if not is_admin(user.id) and not has_active_subscription(chat_id):
-        await update.effective_message.reply_text("Poll მხოლოდ აქტიური გამოწერის მქონეებისთვისაა 🌙")
-        return
-
-    if not is_admin(user.id) and not poll_should_be_sent(chat_id):
-        await update.effective_message.reply_text("Poll უკვე გაიგზავნა ბოლო 30 დღეში ✅")
-        return
-
-    # ჩვეულებრივ იუზერებზე ვნიშნავთ last_poll_sent_utc-ს
-    if not is_admin(user.id):
-        mark_poll_sent(chat_id)
-
-    await start_poll_flow(chat_id, user, context)
-
-
+#     await context.bot.send_message(chat_id=chat.id, text=text)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
@@ -468,24 +260,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     await context.bot.send_message(chat_id=chat.id, text=text)
-
-
-def get_poll_stage(chat_id: int) -> int:
-    data = load_poll_results()
-    uid = str(chat_id)
-    return int(data.get(uid, {}).get("poll_stage") or 0)
-
-def set_poll_stage(chat_id: int, stage: int):
-    data = load_poll_results()
-    uid = str(chat_id)
-    if uid not in data:
-        data[uid] = {}
-    data[uid]["poll_stage"] = stage
-    data[uid]["updated_at_utc"] = datetime.utcnow().isoformat()
-    save_poll_results(data)
-
-def clear_poll_stage(chat_id: int):
-    set_poll_stage(chat_id, 0)
 
 
 
@@ -608,67 +382,6 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"შეტყობინება გაიგზავნა {success} გამომწერთან ✅")
 
-async def start_poll_flow(chat_id: int, user, context: ContextTypes.DEFAULT_TYPE):
-    # დავნიშნოთ, რომ poll active-ია
-    context.user_data["poll_active"] = True
-    context.user_data["poll_stage"] = 1
-
-    # პირველი კითხვა (Q1) — ტექსტად
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text="*1) ყველაზე მეტად რა მოგწონს Shen Space-ში?*\nმომწერე ტექსტად 👇",
-        parse_mode="Markdown",
-    )
-
-async def poll_text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
-
-    chat_id = update.effective_chat.id
-    user = update.effective_user
-    text = update.message.text.strip()
-
-    # თუ poll არ არის აქტიური, არ შევეხოთ
-    stage = context.user_data.get("poll_stage")
-    if not stage:
-        return
-
-    # Q1 ტექსტი
-    if stage == 1:
-        save_user_poll_text(chat_id, "q1_like_most", text)
-        context.user_data["poll_stage"] = 2
-
-        await update.message.reply_text(
-            "*2) რა გაკლია ან რას დაამატებდი?*\nმომწერე ტექსტად 👇",
-            parse_mode="Markdown",
-        )
-        return
-
-    # Q2 ტექსტი -> გადავდივართ Q3 inline-ზე
-    if stage == 2:
-        save_user_poll_text(chat_id, "q2_missing", text)
-        context.user_data["poll_stage"] = 3
-
-        keyboard = [[
-            InlineKeyboardButton("ინსპირაციული ტექსტები", callback_data="poll:q3:inspire"),
-        ],[
-            InlineKeyboardButton("პრაქტიკული რჩევები", callback_data="poll:q3:practical"),
-        ],[
-            InlineKeyboardButton("განათლება / ცოდნა", callback_data="poll:q3:education"),
-        ],[
-            InlineKeyboardButton("მედიტაციები / პრაქტიკები", callback_data="poll:q3:meditation"),
-        ],[
-            InlineKeyboardButton("ტარო", callback_data="poll:q3:taro"),
-        ]]
-
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="*3) რომელი კონტენტი გიზიდავს ყველაზე მეტად?*",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-        )
-        return
-
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
@@ -788,8 +501,6 @@ async def payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text=text)
 
 
-
-
 # ==================== ქვითრის ფოტოს დამუშავება ====================
 
 from telegram.constants import ParseMode
@@ -818,7 +529,9 @@ async def handle_receipt_media(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # ქვითარს ვიღებთ თუ:
     waiting = bool(context.user_data.get("waiting_for_receipt"))
-    if not waiting:
+    subscriber = is_subscriber(chat_id)
+
+    if not waiting and not subscriber:
         return
 
     # ერთხელ მიღების შემდეგ ვხსნით ფლაგს
@@ -872,21 +585,21 @@ async def handle_receipt_media(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # ==================== DEBUG ====================
 
-# async def debug_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-#     if not update.message:
-#         return
+async def debug_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
 
-#     m = update.message
-#     print("=== DEBUG ===")
-#     print("chat_id:", update.effective_chat.id)
-#     print("text:", m.text)
-#     print("has_photo:", bool(m.photo))
-#     print("has_document:", bool(m.document))
-#     if m.document:
-#         print("doc mime:", m.document.mime_type)
-#         print("doc file_name:", m.document.file_name)
-#     print("caption:", m.caption)
-#     print("==============")
+    m = update.message
+    print("=== DEBUG ===")
+    print("chat_id:", update.effective_chat.id)
+    print("text:", m.text)
+    print("has_photo:", bool(m.photo))
+    print("has_document:", bool(m.document))
+    if m.document:
+        print("doc mime:", m.document.mime_type)
+        print("doc file_name:", m.document.file_name)
+    print("caption:", m.caption)
+    print("==============")
 
 
 
@@ -896,46 +609,29 @@ async def handle_receipt_media(update: Update, context: ContextTypes.DEFAULT_TYP
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # ✅ 1) Commands
+    # Command handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("subscribe", subscribe))
-    app.add_handler(CommandHandler("unsubscribe", unsubscribe))
+    app.add_handler(CommandHandler("unsubscribe", unsubscribe))    
     app.add_handler(CommandHandler("price", price))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("premium", premium))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("approve", approve))
-    app.add_handler(CommandHandler("poll", poll_command))
 
-    # ✅ 2) Callback queries (poll + payment)
-    # IMPORTANT: callback_router უნდა იყოს main()-ზე ზემოთ აღწერილი!
-    app.add_handler(CallbackQueryHandler(callback_router))
+    # Callback ღილაკების დამუშავება
+    app.add_handler(CallbackQueryHandler(payment_callback))
 
-    # ✅ 3) Receipt media (photo/image-doc)
+    # ქვითრის (photo ან image-document) ჰენდლერი
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, handle_receipt_media))
 
-    # ✅ 4) Poll text answers (Q1/Q2)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, poll_text_router))
-
-    # ✅ 5) Auto poll job (24h ერთხელ)
-    # IMPORTANT: auto_poll_job უნდა იყოს main()-ზე ზემოთ აღწერილი!
-    app.job_queue.run_repeating(auto_poll_job, interval=24 * 60 * 60, first=30)
-
-    # ✅ 6) DEBUG (ყველაზე ბოლოს!)
-    # დროებით ჯობია ALL არ იყოს, თორემ ყველაფერს "შეჭამს" ლოგიკურად
-    app.add_handler(MessageHandler(filters.TEXT | filters.PHOTO | filters.Document.ALL, debug_all))
+    # 🧪 DEBUG — ეს დაამატე ყველაზე ბოლოს
+    app.add_handler(MessageHandler(filters.ALL, debug_all))
 
     print("Bot started...")
     app.run_polling()
 
 
-
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
