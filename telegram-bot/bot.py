@@ -474,7 +474,7 @@ async def payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"საბაზო ფასი: {BASE_PRICE:.2f} ₾\n"
             f"გადასახადი ({int(TAX_RATE * 100)}%): {tax_amount:.2f} ₾\n"
             f"საბოლოო თანხა გადასახადით: *{total:.2f} ₾*\n\n"
-            "მიმღები: ეკატერინე სარიჯაშვილი\n"
+            "მიმღები: მარიამ გუმბერიძე\n"
             "დანიშნულება: telegram Username\n\n"
             "გადახდის შემდეგ *აუცილებლად* ჩაგვიგდოთ *ფოტო* ან *სქრინშოტი* *(PDF ფაილი არ გამოდგება)* 🌟\n"
             "შემდეგ ადმინი გადაამოწმებს და საბოლოოდ გაგაქტიურებს პრემიუმ კონტენტზე წვდომას."
@@ -487,11 +487,11 @@ async def payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # --- თიბისი ბანკი ---
         await context.bot.send_message(chat_id=chat_id, text="თიბისი ბანკი")
-        await context.bot.send_message(chat_id=chat_id, text="GE46TB7576145064300089")  # TBC ანგარიში
+        await context.bot.send_message(chat_id=chat_id, text="GE09TB7932445064300109")  # TBC ანგარიში
 
         # --- საქართველოს ბანკი ---
         await context.bot.send_message(chat_id=chat_id, text="საქართველოს ბანკი")
-        await context.bot.send_message(chat_id=chat_id, text="GE50BG0000000609711161")  # BOG ანგარიში
+        await context.bot.send_message(chat_id=chat_id, text="GE18BG0000000541925809GEL")  # BOG ანგარიში
 
     elif query.data == "pay_later":
         text = (
